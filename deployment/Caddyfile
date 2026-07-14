@@ -1,0 +1,8 @@
+netradar.example.internal {
+    encode zstd gzip
+    reverse_proxy /api/* backend:8000
+    reverse_proxy /ws/* backend:8000
+    reverse_proxy /health backend:8000
+    root * /srv/frontend
+    file_server
+}
