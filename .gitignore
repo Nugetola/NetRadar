@@ -1,0 +1,17 @@
+# Backend (Python)
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+backend/.venv/
+backend/netradar.db
+*.db
+
+# Frontend
+frontend/node_modules/
+frontend/.env
+
+# General
+.vscode/
+*.log
+.DS_Store
