@@ -105,7 +105,11 @@ async def open_ticket_and_notify(device_id: str, diagnostics: dict) -> None:
         body = _message(device, ticket, reason)
         email_ok = await send_email(agent.email, f"[NetRadar L1] {device.hostname} is DOWN", body) if agent and agent.email else False
         sms_ok = False
-        if device.criticality == "HIGH" and agent and agent.phone_number:
+        # Redundancy: HIGH-criticality incidents always page by SMS; any other
+        # incident also falls back to SMS if the email channel failed, so a
+        # critical alert is never silently lost to an SMTP outage.
+        should_sms = device.criticality == "HIGH" or not email_ok
+        if should_sms and agent and agent.phone_number:
             sms_ok = await send_sms(agent.phone_number, f"NetRadar {device.hostname} {device.ip_address}: {reason}. Ticket {ticket.id}. {get_settings().dashboard_url}")
         ticket.sms_sent, ticket.sms_sent_at = sms_ok, datetime.utcnow() if sms_ok else None
         await session.commit()

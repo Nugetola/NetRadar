@@ -119,7 +119,8 @@ async def history(device_id: str, session: AsyncSession = Depends(get_session)):
     return list((await session.scalars(select(DeviceStatusLog).where(DeviceStatusLog.device_id == device_id).order_by(DeviceStatusLog.recorded_at.desc()).limit(100))).all())
 
 @app.get("/api/diagnostics/{ip_address}", dependencies=[Depends(require_access)])
-async def diagnostics(ip_address: str): return await run_diagnostics(ip_address)
+async def diagnostics(ip_address: str, gateway_ip: str | None = None, switch_ip: str | None = None, switch_port_ifindex: int | None = None):
+    return await run_diagnostics(ip_address, gateway_ip, switch_ip=switch_ip, switch_port_ifindex=switch_port_ifindex, snmp_community=get_settings().snmp_dev_community or None)
 
 @app.get("/api/reports/monthly.pdf", dependencies=[Depends(require_access)])
 async def report(session: AsyncSession = Depends(get_session)):

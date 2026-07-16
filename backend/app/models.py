@@ -31,6 +31,8 @@ class Device(Base):
     device_type: Mapped[str] = mapped_column(String(30), default="PC")
     criticality: Mapped[str] = mapped_column(String(10), default="MEDIUM")
     parent_switch_id: Mapped[str | None] = mapped_column(ForeignKey("devices.id"))
+    switch_port_ifindex: Mapped[int | None] = mapped_column(Integer)  # SNMP ifIndex on parent_switch_id, for Stage 1 triangulation
+    is_dns_server: Mapped[bool] = mapped_column(Boolean, default=False)  # enables the dedicated DNS-service check
     vlan_id: Mapped[int | None] = mapped_column(Integer)
     subnet: Mapped[str | None] = mapped_column(Network)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

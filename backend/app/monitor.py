@@ -1,9 +1,10 @@
 import asyncio
 from datetime import datetime, timezone
 from sqlalchemy import func, select
+from .config import get_settings
 from .database import SessionLocal
 from .diagnostics import run_diagnostics
-from .models import Device, DeviceStatusLog
+from .models import Branch, Device, DeviceStatusLog
 from .realtime import manager
 from .notifications import open_ticket_and_notify
 
@@ -24,7 +25,24 @@ async def poll_device(device_id: str):
                 session.add(DeviceStatusLog(device_id=device.id, status="DOWN", failure_reason="DEPENDENCY_OUTAGE", diagnostics={"parent_switch_id": parent.id, "parent_hostname": parent.hostname}))
                 await session.commit()
                 return
-        diagnostic = await run_diagnostics(device.ip_address)
+        gateway_ip = None
+        if device.branch_id:
+            branch = await session.get(Branch, device.branch_id)
+            gateway_ip = branch.wan_gateway_ip if branch else None
+        switch_ip = None
+        if device.parent_switch_id:
+            switch = await session.get(Device, device.parent_switch_id)
+            switch_ip = switch.ip_address if switch else None
+        settings = get_settings()
+        # Production: resolve VlanProfile.snmp_credential_ref via the secrets manager.
+        # Dev/lab only: fall back to the community string configured in .env.
+        snmp_community = settings.snmp_dev_community or None
+        diagnostic = await run_diagnostics(
+            device.ip_address, gateway_ip,
+            switch_ip=switch_ip, switch_port_ifindex=device.switch_port_ifindex,
+            snmp_community=snmp_community,
+            dns_check_hostname=settings.dns_test_hostname if device.is_dns_server else None,
+        )
         is_up = diagnostic["ping_status"] == "SUCCESS" or diagnostic["failure_reason"] == "ICMP_BLOCKED"
         if is_up:
             status, device.failure_count = "UP", 0

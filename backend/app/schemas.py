@@ -9,6 +9,8 @@ class DeviceCreate(BaseModel):
     criticality: str = "MEDIUM"
     branch_id: str | None = None
     parent_switch_id: str | None = None
+    switch_port_ifindex: int | None = None
+    is_dns_server: bool = False
     vlan_id: int | None = None
     subnet: str | None = None
 

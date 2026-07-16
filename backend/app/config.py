@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     service_api_key: str = ""
     it_support_webhook_url: str = ""
     heartbeat_interval_seconds: int = 30
+    # Dev/lab-only SNMP v2c community for local testing. Production MUST resolve
+    # VlanProfile.snmp_credential_ref via the secrets manager instead — never set
+    # a real community string here.
+    snmp_dev_community: str = ""
+    dns_test_hostname: str = "oic.local"
 
 
 @lru_cache
