@@ -1,0 +1,298 @@
+/* ============================================================
+   AddDeviceForm.css - Dark Theme (Black Background, White Text)
+   ============================================================ */
+
+.adf-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 0.25rem;
+    max-width: 100%;
+    background: #1a1a2e;
+    color: #ffffff;
+}
+
+/* ============================================================
+   Message
+   ============================================================ */
+.adf-message {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    animation: adfSlideDown 0.3s ease;
+}
+
+.adf-message-success {
+    background: #1a3a2a;
+    color: #4ade80;
+    border: 1px solid #2d5a3d;
+}
+
+.adf-message-error {
+    background: #3a1a1a;
+    color: #f87171;
+    border: 1px solid #5a2d2d;
+}
+
+@keyframes adfSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================
+   Row
+   ============================================================ */
+.adf-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* ============================================================
+   Form Group
+   ============================================================ */
+.adf-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.adf-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    letter-spacing: 0.3px;
+}
+
+.adf-required {
+    color: #f87171;
+    font-weight: 700;
+    margin-right: 2px;
+}
+
+/* ============================================================
+   Inputs - Dark Theme
+   ============================================================ */
+.adf-input,
+.adf-select {
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    border: 1.5px solid #2d2d4a;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: all 0.25s ease;
+    background: #0f0f1a;
+    color: #ffffff;
+}
+
+.adf-input::placeholder {
+    color: #6b6b8a;
+}
+
+.adf-input:focus,
+.adf-select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    background: #1a1a2e;
+}
+
+.adf-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    padding-right: 2.5rem;
+    cursor: pointer;
+}
+
+.adf-select option {
+    background: #1a1a2e;
+    color: #ffffff;
+}
+
+/* ============================================================
+   Organization Section - Dark Theme
+   ============================================================ */
+.adf-org-section {
+    background: #0f0f1a;
+    padding: 1.25rem;
+    border-radius: 12px;
+    border: 1.5px solid #2d2d4a;
+}
+
+.adf-org-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.adf-org-radio-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.adf-org-radio {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    background: #1a1a2e;
+    border: 2px solid #2d2d4a;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-weight: 500;
+    font-size: 0.9rem;
+    flex: 1;
+    justify-content: center;
+    color: #cbd5e1;
+}
+
+.adf-org-radio:hover {
+    border-color: #6366f1;
+    background: #2d2d4a;
+}
+
+.adf-org-radio.active {
+    border-color: #818cf8;
+    background: #312e81;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    color: #ffffff;
+}
+
+.adf-org-radio input[type="radio"] {
+    display: none;
+}
+
+.adf-org-icon {
+    font-size: 1.1rem;
+}
+
+.adf-org-dropdown {
+    margin-top: 0.5rem;
+}
+
+.adf-org-dropdown .adf-select {
+    background: #0f0f1a;
+    color: #ffffff;
+    border: 1.5px solid #2d2d4a;
+}
+
+.adf-org-dropdown .adf-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.adf-org-dropdown .adf-label {
+    color: #cbd5e1;
+}
+
+/* ============================================================
+   Buttons - Dark Theme
+   ============================================================ */
+.adf-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #2d2d4a;
+}
+
+.adf-btn {
+    padding: 0.6rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.adf-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.adf-btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.adf-btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.adf-btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.adf-btn-secondary {
+    background: #2d2d4a;
+    color: #cbd5e1;
+}
+
+.adf-btn-secondary:hover:not(:disabled) {
+    background: #3d3d5a;
+}
+
+/* ============================================================
+   Spinner
+   ============================================================ */
+.adf-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: adfSpin 0.6s linear infinite;
+}
+
+@keyframes adfSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+    .adf-row {
+        grid-template-columns: 1fr;
+    }
+
+    .adf-org-radio-group {
+        flex-direction: column;
+    }
+
+    .adf-org-radio {
+        justify-content: flex-start;
+    }
+
+    .adf-actions {
+        flex-direction: column-reverse;
+    }
+
+    .adf-btn {
+        justify-content: center;
+        width: 100%;
+    }
+}

@@ -1,9 +1,21 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OIC NetRadar</title><link rel="stylesheet" href="style.css"></head><body>
-<header><div><span class="eyebrow">OROMIA INSURANCE COMPANY</span><h1>NetRadar</h1></div><div id="connection" class="badge neutral">Connecting</div></header>
-<div id="loginOverlay" class="login-overlay" hidden><form id="loginForm" class="login-card"><span class="eyebrow">SECURE ACCESS</span><h2>Sign in to NetRadar</h2><input name="username" autocomplete="username" placeholder="Username" required><input name="password" type="password" autocomplete="current-password" placeholder="Password" required><button>Sign in</button><p id="loginMessage" class="muted"></p></form></div>
-<main><section class="intro"><div><h2>Network health at a glance</h2><p>Live monitoring for OIC's static-IP network estate.</p></div><button id="refresh">Refresh inventory</button></section>
-<section id="summary" class="summary"></section>
-<section class="panel"><div class="panel-title"><h2>Device inventory</h2><span id="lastUpdate">Waiting for data</span></div><div class="table-wrap"><table><thead><tr><th>Device</th><th>Static IP</th><th>Type</th><th>VLAN</th><th>Criticality</th><th>Status</th><th></th></tr></thead><tbody id="devices"></tbody></table></div></section>
-<section class="panel"><h2>Add monitored device</h2><form id="deviceForm"><input name="hostname" placeholder="Hostname" required><input name="ip_address" placeholder="Static IP address" required><select name="device_type"><option>PC</option><option>SERVER</option><option>SWITCH</option><option>ROUTER</option></select><select name="criticality"><option>MEDIUM</option><option>HIGH</option><option>LOW</option></select><input name="vlan_id" type="number" placeholder="VLAN (optional)"><input name="switch_port_ifindex" type="number" placeholder="Switch ifIndex (optional)"><label class="check"><input name="is_dns_server" type="checkbox"> DNS server</label><button>Add device</button></form><p id="formMessage" class="muted"></p></section>
-<section class="panel"><h2>Live incident feed</h2><div id="feed" class="feed"><p class="muted">No status events yet.</p></div></section>
-</main><script src="app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OIC NetRadar</title>
+    
+    <!-- ============================================================
+         FONT AWESOME CDN - REQUIRED FOR ICONS
+         ============================================================ -->
+    <link 
+      rel="stylesheet" 
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" 
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

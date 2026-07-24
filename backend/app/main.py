@@ -1,141 +1,253 @@
+"""
+OIC NetRadar - Enterprise Network Monitoring System
+Main Application Entry Point
+"""
+
+import os
+import sys
+import asyncio
+import logging
+
+# ============================================================================
+# Windows Event Loop Policy
+# ============================================================================
+# On Windows, asyncio.create_subprocess_exec() (used by DiagnosticEngine for
+# ping/traceroute) requires the ProactorEventLoop. Uvicorn/some libraries can
+# default to SelectorEventLoop, which raises NotImplementedError (with an
+# EMPTY message) for subprocess calls. This must be set before anything else
+# creates an event loop.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import Depends, FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from .config import get_settings
-from .database import SessionLocal, engine, get_session
-from .diagnostics import run_diagnostics
-from .models import Agent, Base, Branch, Device, DeviceStatusLog, ServiceHeartbeat, Ticket, VlanProfile
-from .monitor import poll_all_devices, poll_device
-from .notifications import escalate_unacknowledged
-from .passive import start_passive_listeners
-from .realtime import manager
-from .reports import monthly_report
-from .schemas import AgentCreate, AgentView, BranchCreate, DeviceCreate, DeviceView, LoginRequest, VlanProfileCreate
-from .security import issue_token, require_access, verify_token
+from fastapi.responses import JSONResponse
+import uvicorn
 
-scheduler = AsyncIOScheduler()
+# Import application modules
+from app.config import settings, is_development
+from app.database import engine, AsyncSessionLocal, Base, get_db
+from app.services.polling_service import PollingService
+from app.services.websocket_manager import websocket_manager
+from app.services.diagnostic_engine import DiagnosticEngine
+from app.services.snmp_service import SNMPService
+from app.services.notification_service import NotificationService
+from app.services.alert_escalation import AlertEscalationService
 
-async def record_heartbeat():
-    async with SessionLocal() as session:
-        session.add(ServiceHeartbeat())
-        await session.commit()
+# Import API routers
+from app.api import routes
+from app.api.websocket import router as websocket_router
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# Global Services
+# ============================================================================
+
+diagnostic_engine = DiagnosticEngine()
+
+snmp_service = SNMPService(
+    community=settings.SNMP_COMMUNITY,
+    timeout=settings.SNMP_TIMEOUT,
+)
+
+polling_service = PollingService(
+    db_session_factory=AsyncSessionLocal,
+    websocket_manager=websocket_manager,
+    diagnostic_engine=diagnostic_engine,
+    snmp_service=snmp_service,
+    poll_interval=settings.POLL_INTERVAL_SECONDS,
+    debounce_window=settings.DEBOUNCE_WAIT_SECONDS
+)
+
+notification_service = NotificationService()
+
+alert_escalation_service = AlertEscalationService(
+    db_session_factory=AsyncSessionLocal
+)
+
+# ============================================================================
+# Lifespan Manager
+# ============================================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    scheduler.add_job(poll_all_devices, "interval", seconds=get_settings().poll_interval_seconds, id="poll-all", replace_existing=True)
-    scheduler.add_job(escalate_unacknowledged, "interval", minutes=5, id="escalate-tickets", replace_existing=True)
-    scheduler.add_job(record_heartbeat, "interval", seconds=get_settings().heartbeat_interval_seconds, id="heartbeat", replace_existing=True)
-    scheduler.start()
-    listeners = await start_passive_listeners()
+    """Handles application startup and shutdown events."""
+    
+    # ===== STARTUP =====
+    logger.info("=" * 60)
+    logger.info(f"🚀 {settings.APP_NAME} Starting Up...")
+    logger.info(f"📊 Environment: {settings.ENVIRONMENT}")
+    logger.info(f"🔄 Poll Interval: {settings.POLL_INTERVAL_SECONDS}s")
+    logger.info(f"⏱️  Debounce Window: {settings.DEBOUNCE_WAIT_SECONDS}s")
+    logger.info("=" * 60)
+    
+    try:
+        # Create database tables
+        logger.info("📁 Creating database tables...")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ Database tables created/verified")
+        
+        # Start polling service
+        logger.info("🔄 Starting polling service...")
+        await polling_service.start_polling()
+        logger.info("✅ Polling service started")
+        
+        # Start escalation service
+        logger.info("📈 Starting escalation service...")
+        await alert_escalation_service.start()
+        logger.info("✅ Escalation service started")
+        
+    except Exception as e:
+        logger.error(f"❌ Startup error: {e}")
+        raise
+    
     yield
-    scheduler.shutdown(wait=False)
-    for listener in listeners:
-        listener.close()
+    
+    # ===== SHUTDOWN =====
+    logger.info("=" * 60)
+    logger.info("🛑 OIC NetRadar Shutting Down...")
+    
+    try:
+        await polling_service.stop_polling()
+        await alert_escalation_service.stop()
+        await engine.dispose()
+        logger.info("✅ Shutdown complete")
+    except Exception as e:
+        logger.error(f"❌ Shutdown error: {e}")
+    
+    logger.info("=" * 60)
 
-app = FastAPI(title="OIC NetRadar", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins.split(","), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# ============================================================================
+# FastAPI Application
+# ============================================================================
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="""
+    Enterprise-grade network and server monitoring system for Oromia Insurance Company.
+    
+    Features:
+    - Real-time device monitoring across 62 branches
+    - Root cause diagnostic engine
+    - Automatic alert escalation
+    - WebSocket real-time updates
+    - Historical reporting
+    """,
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
+
+# ============================================================================
+# CORS Configuration
+# ============================================================================
+
+# Get CORS origins from settings
+cors_origins = settings.CORS_ORIGINS
+
+if is_development():
+    cors_origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ============================================================================
+# Include Routers
+# ============================================================================
+
+app.include_router(routes.router)
+app.include_router(websocket_router)
+
+# ============================================================================
+# Health Check Endpoints
+# ============================================================================
 
 @app.get("/health")
-async def health(): return {"status": "ok", "time": datetime.now(timezone.utc).isoformat()}
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "environment": settings.ENVIRONMENT
+    }
 
-@app.post("/api/auth/token")
-async def login(payload: LoginRequest):
-    settings = get_settings()
-    if payload.username != settings.admin_username or payload.password != settings.admin_password:
-        raise HTTPException(401, "Invalid credentials")
-    return {"access_token": issue_token(payload.username), "token_type": "bearer"}
+@app.get("/")
+async def root():
+    """API root endpoint."""
+    return {
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "description": "Enterprise Network Monitoring System",
+        "documentation": "/api/docs",
+        "health": "/health",
+        "websocket": "ws://localhost:8000/ws",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
 
-@app.get("/api/branches", dependencies=[Depends(require_access)])
-async def list_branches(session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(Branch).order_by(Branch.name))).all())
+# ============================================================================
+# Exception Handlers
+# ============================================================================
 
-@app.post("/api/branches", status_code=201, dependencies=[Depends(require_access)])
-async def add_branch(payload: BranchCreate, session: AsyncSession = Depends(get_session)):
-    if await session.scalar(select(Branch).where(Branch.name == payload.name)):
-        raise HTTPException(409, "Branch name already exists")
-    branch = Branch(**payload.model_dump()); session.add(branch); await session.commit(); await session.refresh(branch)
-    return branch
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions."""
+    logger.warning(f"HTTP Exception: {exc.status_code} - {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    )
 
-@app.get("/api/vlan-profiles", dependencies=[Depends(require_access)])
-async def list_vlan_profiles(session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(VlanProfile).order_by(VlanProfile.vlan_id))).all())
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle general exceptions."""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal server error",
+            "detail": str(exc) if is_development() else "An unexpected error occurred",
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    )
 
-@app.post("/api/vlan-profiles", status_code=201, dependencies=[Depends(require_access)])
-async def add_vlan_profile(payload: VlanProfileCreate, session: AsyncSession = Depends(get_session)):
-    if await session.scalar(select(VlanProfile).where(VlanProfile.vlan_id == payload.vlan_id)):
-        raise HTTPException(409, "VLAN profile already exists")
-    profile = VlanProfile(**payload.model_dump()); session.add(profile); await session.commit(); await session.refresh(profile)
-    return profile
+# ============================================================================
+# Development Server Entry Point
+# ============================================================================
 
-@app.get("/api/devices", response_model=list[DeviceView], dependencies=[Depends(require_access)])
-async def list_devices(session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(Device).order_by(Device.hostname))).all())
-
-@app.post("/api/devices", response_model=DeviceView, status_code=201, dependencies=[Depends(require_access)])
-async def add_device(payload: DeviceCreate, session: AsyncSession = Depends(get_session)):
-    if await session.scalar(select(Device).where(Device.ip_address == payload.ip_address)):
-        raise HTTPException(409, "A device with this assigned static IP already exists")
-    device = Device(**payload.model_dump())
-    session.add(device); await session.commit(); await session.refresh(device)
-    return device
-
-@app.get("/api/agents", response_model=list[AgentView], dependencies=[Depends(require_access)])
-async def list_agents(session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(Agent).order_by(Agent.full_name))).all())
-
-@app.post("/api/agents", response_model=AgentView, status_code=201, dependencies=[Depends(require_access)])
-async def add_agent(payload: AgentCreate, session: AsyncSession = Depends(get_session)):
-    agent = Agent(**payload.model_dump())
-    session.add(agent); await session.commit(); await session.refresh(agent)
-    return agent
-
-@app.get("/api/tickets", dependencies=[Depends(require_access)])
-async def list_tickets(session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(Ticket).order_by(Ticket.opened_at.desc()).limit(100))).all())
-
-@app.post("/api/tickets/{ticket_id}/acknowledge", dependencies=[Depends(require_access)])
-async def acknowledge_ticket(ticket_id: str, session: AsyncSession = Depends(get_session)):
-    ticket = await session.get(Ticket, ticket_id)
-    if not ticket: raise HTTPException(404, "Ticket not found")
-    if ticket.status == "OPEN":
-        ticket.status, ticket.acknowledged_at = "ACKNOWLEDGED", datetime.now(timezone.utc)
-        await session.commit()
-    return {"id": ticket.id, "status": ticket.status}
-
-@app.post("/api/devices/{device_id}/poll", dependencies=[Depends(require_access)])
-async def poll_now(device_id: str, session: AsyncSession = Depends(get_session)):
-    if not await session.get(Device, device_id): raise HTTPException(404, "Device not found")
-    await poll_device(device_id)
-    return {"accepted": True}
-
-@app.get("/api/devices/{device_id}/history", dependencies=[Depends(require_access)])
-async def history(device_id: str, session: AsyncSession = Depends(get_session)):
-    return list((await session.scalars(select(DeviceStatusLog).where(DeviceStatusLog.device_id == device_id).order_by(DeviceStatusLog.recorded_at.desc()).limit(100))).all())
-
-@app.get("/api/diagnostics/{ip_address}", dependencies=[Depends(require_access)])
-async def diagnostics(ip_address: str, gateway_ip: str | None = None, switch_ip: str | None = None, switch_port_ifindex: int | None = None):
-    return await run_diagnostics(ip_address, gateway_ip, switch_ip=switch_ip, switch_port_ifindex=switch_port_ifindex, snmp_community=get_settings().snmp_dev_community or None)
-
-@app.get("/api/reports/monthly.pdf", dependencies=[Depends(require_access)])
-async def report(session: AsyncSession = Depends(get_session)):
-    return Response(await monthly_report(session), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=netradar-monthly-report.pdf"})
-
-@app.websocket("/ws/live")
-async def live_updates(websocket: WebSocket):
-    if get_settings().auth_required:
-        try:
-            verify_token(websocket.query_params.get("token", ""))
-        except HTTPException:
-            await websocket.close(code=1008)
-            return
-    await manager.connect(websocket)
-    try:
-        while True: await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+if __name__ == "__main__":
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
